@@ -51,18 +51,15 @@ module.exports.registerUser = (req, res) => {
 
 				return newUser.save()
 				.then((result) => {
-					res.send({
+					return res.status(201).send({
 						message: 'Registered successfully',
 					});
 				})
-				.catch((error) => {
-					return res.send({
-						message: 'Register failed!',
-					});
-				})
+				.catch((err) => errorHandler(err, req, res));
 
 			}
 		})
+		.catch((err) => errorHandler(err, req, res));
 
 	}
 
@@ -116,8 +113,8 @@ module.exports.loginUser = (req, res) => {
 
 
 
-
-// Get All user
+ 
+// Get All user (Admin only)
 module.exports.allUser = (req, res) => {
 	return User.find({})
 	.select('-password')
@@ -140,7 +137,7 @@ module.exports.allUser = (req, res) => {
 
 
 
-// Get specific user by Id
+// Get specific user by Id (Admin only)
 module.exports.getUser = (req, res) => {
 	return User.findById(req.params.id)
 	.then((findUserRes) => {
@@ -166,7 +163,28 @@ module.exports.getUser = (req, res) => {
 
 
 
-// Delete all user
+// Delete specific user (Admin only)
+module.exports.deleteUser = (req, res) => {
+	return User.findByIdAndDelete(req.params.id)
+	.then((deleteUser) => {
+		if (deleteUser){
+			return res.status(200).send({
+				message: `User ${deleteUser.firstName} successfully deleted`
+			})
+		} else {
+			return res.status(404).send({
+				message: 'User does not exist'
+			})
+		}
+	})
+	.catch((err) => errorHandler(err, req, res));
+}
+
+
+
+
+
+// Delete all user (Admin only)
 module.exports.deleteAll = (req, res) => {
 	return User.deleteMany({isAdmin: false})
 	.then((deleteRes) => {
@@ -180,11 +198,7 @@ module.exports.deleteAll = (req, res) => {
 			})
 		}
 	})
-	.catch((err) => {
-		res.status(500).send({
-			message: `Server error ${err}`
-		})
-	})
+	.catch((err) => errorHandler(err, req, res));
 }
 
 
@@ -233,6 +247,141 @@ module.exports.updateProfile = (req, res) => {
 							message: `Profile updated successfully`,
 							Info: userRes 
 						})
+					}
+				})
+				.catch((err) => errorHandler(err, req, res));
+
+			}
+
+		}
+	})
+
+}
+
+
+
+
+// Turn user into admin by ID (Admin only)
+module.exports.userToAdmin = (req, res) => {
+	const userId = req.params.id;
+
+	const adminData = {
+		isAdmin: true
+	}
+
+	return User.findById(userId)
+	.then((existingAdmin) => {
+		if (existingAdmin.isAdmin === true){
+			return res.status(200).send({
+				message: `This user is already an ADMIN`
+			})
+		} else {
+
+			return User.findByIdAndUpdate(userId, adminData, { new: true})
+			.then((adminRes) => {
+				if (adminRes){
+					return res.status(200).send({
+						message: `${adminRes.firstName} ${adminRes.lastName} is now ADMIN`
+					})
+				} else {
+					return res.status(404).send({
+						message: 'User does not exist'
+					})
+				}
+			})
+			.catch((err) => errorHandler(err, req, res));
+
+		}
+	})
+	.catch((err) => errorHandler(err, req, res));
+
+}
+
+
+
+
+
+// Turn Admin into a User by ID (Admin only)
+module.exports.adminToUser = (req, res) => {
+	const userId = req.params.id;
+
+	const adminData = {
+		isAdmin: false
+	}
+
+	return User.findById(userId)
+	.then((existingUser) => {
+		if (existingUser.isAdmin === false){
+			return res.status(200).send({
+				message: `${existingUser.firstName} ${existingUser.lastName} is not ADMIN`
+			})
+		} else {
+
+			return User.findByIdAndUpdate(userId, adminData, { returnDocument: 'after'})
+			.then((userRes) => {
+				if (userRes){
+					return res.status(200).send({
+						message: `${userRes.firstName} ${userRes.lastName} has been demoted from ADMIN role`
+					})
+				} else {
+					return res.status(404).send({
+						message: 'User does not exist'
+					})
+				}
+			})
+			.catch((err) => errorHandler(err, req, res));
+
+		}
+	})
+	.catch((err) => errorHandler(err, req, res));
+}
+
+
+
+
+// Change password feature for both Admin and User
+module.exports.changePassword = (req, res) => {
+	const userId = req.user.id;
+	const updatePass = {
+		password: bcrypt.hashSync(req.body.password, 10)
+	}
+
+	return User.findById(userId)
+	.then((passRes) => {
+		if (bcrypt.compareSync(req.body.password, passRes.password)){
+			return res.status(200).send({
+				message: 'No change has been made, password is up to date'
+			})
+		} else {
+
+			if (!req.body.password || req.body.password.length <= 8){
+				return res.status(400).send({
+					message: 'Password should contain greater than 8 characters'
+				})
+			} else {
+
+				return User.findById(userId)
+				.then((existing) => {
+					if (!existing){
+						return res.status(404).send({
+							message: 'User does not exist'
+						})
+					} else {
+
+						return User.findByIdAndUpdate(userId, updatePass, { new: true})
+						.then((changePass) => {
+							if (changePass){
+								return res.status(200).send({
+									message: 'Password updated successfully'
+								})
+							} else {
+								return res.status(400).send({
+									message: 'Change password failed'
+								})
+							}
+						})
+						.catch((err) => errorHandler(err, req, res));
+
 					}
 				})
 				.catch((err) => errorHandler(err, req, res));
