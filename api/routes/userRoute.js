@@ -44,6 +44,10 @@ router.put('/admin-to-user/:id', verify, verifyAdmin, userController.adminToUser
 router.put('/changepass', verify, userController.changePassword);
 
 
+// Router for get user details
+router.get('/details', verify, userController.userDetails);
+
+
 
 
 

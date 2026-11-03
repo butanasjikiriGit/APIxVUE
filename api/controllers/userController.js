@@ -1,6 +1,7 @@
 const User = require('../models/userModel.js');
 const bcrypt = require('bcrypt');
 const auth = require('../auth.js');
+const { errorHandler } = require('../auth');
 
 
 // Controller for user registration
@@ -391,4 +392,23 @@ module.exports.changePassword = (req, res) => {
 		}
 	})
 
+}
+
+
+// Get user details 
+module.exports.userDetails = (req, res) => {
+	const userId = req.user.id;
+
+	return User.findById(userId)
+	.select('-password')
+	.then((detailsRes) => {
+		if (!detailsRes) {
+			return res.status(404).send({
+				message: 'User does not exist'
+			})
+		} else {
+			return res.status(200).send(detailsRes);
+		}
+	})
+	.catch((err) => errorHandler(err, req, res));
 }

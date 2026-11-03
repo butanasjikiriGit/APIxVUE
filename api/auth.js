@@ -4,13 +4,13 @@ const dotenv = require('dotenv');
 dotenv.config();
 
 module.exports.createAccessToken = (user) => {
-    const data = {
+    const userData = {
         id : user._id,
         email : user.email,
         isAdmin : user.isAdmin
     };
 
-    return jwt.sign(data, process.env.JWT_SECRET_KEY, {}); 
+    return jwt.sign(userData, process.env.JWT_SECRET_KEY, {}); 
 };
 
 module.exports.verify = (req, res, next) => {
