@@ -218,7 +218,7 @@ module.exports.updateProfile = (req, res) => {
 	return User.findById(userId)
 	.then((isExisting) => {
 		if (isExisting.firstName === req.body.firstName && isExisting.lastName === req.body.lastName && isExisting.mobileNum === req.body.mobileNum){
-			return res.status(200).send({
+			return res.status(204).send({
 				message: 'No change made, profile is already up to date'
 			})
 		} else {

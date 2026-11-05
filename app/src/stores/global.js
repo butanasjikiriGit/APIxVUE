@@ -14,6 +14,9 @@ export const useGlobalStore = defineStore('global', () => {
 			user.token = null;
 			user.email = null;
 			user.isAdmin = null;
+			user.firstName = null;
+			user.lastName = null;
+			user.mobileNum = null
 
 			return;
 		}
@@ -23,6 +26,9 @@ export const useGlobalStore = defineStore('global', () => {
 		user.token = token;
 		user.email = data.email;
 		user.isAdmin = data.isAdmin;
+		user.firstName = data.firstName;
+		user.lastName = data.lastName;
+		user.mobileNum = data.mobileNum;
 	}
 
 	return {

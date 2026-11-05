@@ -189,7 +189,8 @@
 	}
 
 	onBeforeMount(() => {
-		if (user.token){
+		const token = localStorage.getItem('token');
+		if (token){
 			router.push({
 				path: '/home'
 			})

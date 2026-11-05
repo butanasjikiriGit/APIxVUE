@@ -27,6 +27,11 @@ const router = createRouter({
 			path: '/home',
 			name: 'Home',
 			component: Home
+		},
+		{
+			path: '/profile',
+			name: 'Profile',
+			component: Profile
 		}
 	]
 });
@@ -35,6 +40,7 @@ const router = createRouter({
 import Login from './pages/Login.vue';
 import Register from './pages/Register.vue';
 import Home from './pages/Home.vue';
+import Profile from './pages/Profile.vue';
 
 
 

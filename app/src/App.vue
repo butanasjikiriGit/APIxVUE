@@ -1,10 +1,10 @@
 <script setup>
 
-import NavbarComponent from './pages/NavbarComponent.vue';
+import Navbar from './components/Navbar.vue';
 import { useGlobalStore } from './stores/global.js';
 import { onBeforeMount } from 'vue';
 
-const { getUserDetails } = useGlobalStore();
+const { getUserDetails, user } = useGlobalStore();
 
 onBeforeMount(() => {
   getUserDetails(localStorage.getItem('token'));
@@ -16,8 +16,7 @@ onBeforeMount(() => {
 
 <template>
 
-  <NavbarComponent />
-
+  <Navbar v-if="user.email" />
   <router-view />
 
 </template>
