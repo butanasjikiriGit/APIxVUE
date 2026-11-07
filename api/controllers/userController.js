@@ -1,60 +1,78 @@
 const User = require('../models/userModel.js');
 const bcrypt = require('bcrypt');
-const auth = require('../auth.js');
-const { errorHandler } = require('../auth');
+const { errorHandler, createAccessToken } = require('../auth.js');
+
 
 
 // Controller for user registration
 module.exports.registerUser = (req, res) => {
 
-	if (!req.body.firstName || req.body.firstName === ""){
-		return res.status(400).send({
-			message: 'First name should not be empty'
+	const { firstName, lastName, email, password, mobileNum, role } = req.body;
+	const nameRegex = /^[a-zA-ZÀ-ÿ\s'-]+$/;
+	const numberRegex = /^\d+$/;
+
+	if (!firstName || !lastName || !email || !password || !mobileNum || !role){
+		return res.status(422).send({
+			message: 'Please make sure to fill out all field'
 		});
-	} else if (!req.body.lastName || req.body.lastName === ""){
-		return res.status(400).send({
-			message: 'Last name should not be empty'
-		});
-	} else if (!req.body.email || !req.body.email.includes('@') || !req.body.email.includes('.com')){
-		return res.status(400).send({
-			message: 'email/gmail syntax should contain @ / .com'
-		});
-	} else if (!req.body.password || req.body.password.length <= 8){
-		return res.status(400).send({
-			message: 'The password should contain greater than 8 characters'
-		});
-	} else if (!req.body.mobileNum || req.body.mobileNum.length !== 11){
-		return res.status(400).send({
-			message: 'Mobile number should be 11 digits in total'
+	} else if (!nameRegex.test(firstName) || !nameRegex.test(lastName)) {
+		return res.status(422).send({
+			message: 'Firstname and lastname should not contain numbers'
+		})
+	} else if (!email.includes('@') || !email.endsWith('.com')){
+		return res.status(422).send({
+			message: 'Invalid email format'
+		})
+	} else if (password.length <= 8){
+		return res.status(422).send({
+			message: 'Password must be more that 8 characters'
+		})
+	} else if (!numberRegex.test(mobileNum)){
+		return res.status(422).send({
+			message: 'Mobile number should contain numbers only'
+		})
+	} else if (!mobileNum.startsWith('09')) {
+		return res.status(422).send({
+			message: 'Invalid mobile number format'
+		})
+	} else if (mobileNum.length !== 11){
+		return res.status(422).send({
+			message: 'Mobile number should contain 11 digits only'
+		})
+	} else if (!role) {
+		return res.status(422).send({
+			message: 'Please choose role [operator, renter]'
 		})
 	} else {
 
-		return User.findOne({
-			$or: [
-				{email: req.body.email},
-				{firstName: req.body.firstName}
-			]
-		})
+		return User.findOne({ email: email })
 		.then((existing) => {
 			if (existing){
-				res.send({
-					message: `User with (${existing.email}) email and (${existing.firstName}) as first name is already registered.`
+				return res.status(409).send({
+					message: `Email already existed, Please choose another email`
 				})
 			} else {
 
 				let newUser = new User({
-					firstName: req.body.firstName,
-					lastName: req.body.lastName,
-					email: req.body.email,
-					password: bcrypt.hashSync(req.body.password, 10),
-					mobileNum: req.body.mobileNum
-				})
+					firstName: firstName,
+					lastName: lastName,
+					email: email,
+					mobileNum: mobileNum,
+					role: role,
+					password: bcrypt.hashSync(password, 10)
+				});
 
 				return newUser.save()
-				.then((result) => {
-					return res.status(201).send({
-						message: 'Registered successfully',
-					});
+				.then((register) => {
+					if (!register){
+						return res.status(400).send({
+							message: 'Failed to register'
+						})
+					} else {
+						return res.status(201).send({
+							message: 'Register successfully'
+						})
+					}
 				})
 				.catch((err) => errorHandler(err, req, res));
 
@@ -70,43 +88,40 @@ module.exports.registerUser = (req, res) => {
 
 
 
-// Function for user login
+// Controller for user login
 module.exports.loginUser = (req, res) => {
 
-	if (!req.body.email || !req.body.email.includes("@") || !req.body.email.includes('.com')){
-		res.status(400).send({
+	const { email, password } = req.body;
+
+	if (!email.includes('@') || !email.endsWith('.com')){
+		return res.status(422).send({
 			message: 'Invalid email format'
 		})
-	} else if (!req.body.password){
-		res.status(400).send({
-			message: 'Please input a password'
-		})
 	} else {
-		return User.findOne({ email: req.body.email})
+
+		return User.findOne({ email: email })
 		.then((result) => {
 			if (!result){
-				res.status(404).send({
-					message: 'No user found in this email'
+				return res.status(404).send({
+					message: 'No user found'
 				})
 			} else {
-				const isPasswordCorrect = bcrypt.compareSync(req.body.password, result.password);
+				const isPasswordCorrect = bcrypt.compareSync(password, result.password);
+
 				if (isPasswordCorrect){
 					return res.status(200).send({
-						message: 'Logged in successfully',
-						access: auth.createAccessToken(result)
+						message: 'Logged In successfully',
+						access: createAccessToken(result)
 					})
 				} else {
 					return res.status(401).send({
-						message: 'Incorrect email or password'
+						message: 'Incorrect email and password'
 					})
 				}
 			}
 		})
-		.catch((err) => {
-			return res.status(500).send({
-				message: `Server error during login: ${err}`
-			})
-		})
+		.catch((err) => errorHandler(err, req, res));
+
 	}
 
 }
@@ -114,301 +129,96 @@ module.exports.loginUser = (req, res) => {
 
 
 
- 
-// Get All user (Admin only)
-module.exports.allUser = (req, res) => {
-	return User.find({})
+
+// Controller for getting user details
+module.exports.userDetails = (req, res) => {
+
+	const userId = req.user.id
+
+	return User.findById(userId)
 	.select('-password')
 	.then((result) => {
-		if (result.length === 0){
+		if (!result) {
 			return res.status(404).send({
-				message: 'No existing user!'
+				message: 'No data found'
 			})
 		} else {
-			return res.status(200).send({
-				message: 'These are the following user',
-				data: result
-			})
-		}
-	})
-	.catch((err) => err);
-}
-
-
-
-
-
-// Get specific user by Id (Admin only)
-module.exports.getUser = (req, res) => {
-	return User.findById(req.params.id)
-	.then((findUserRes) => {
-		if (findUserRes){
-			return res.status(200).send({
-				message: `User ${findUserRes.firstName} ${findUserRes.lastName} found`,
-				info: findUserRes
-			})
-		} else {
-			return res.status(404).send({
-				message: 'User does not exist'
-			})
+			return res.status(200).send(result);
 		}
 	})
 	.catch((err) => {
 		return res.status(500).send({
 			message: `Server error ${err}`
 		})
-	});
-}
-
-
-
-
-
-// Delete specific user (Admin only)
-module.exports.deleteUser = (req, res) => {
-	return User.findByIdAndDelete(req.params.id)
-	.then((deleteUser) => {
-		if (deleteUser){
-			return res.status(200).send({
-				message: `User ${deleteUser.firstName} successfully deleted`
-			})
-		} else {
-			return res.status(404).send({
-				message: 'User does not exist'
-			})
-		}
 	})
-	.catch((err) => errorHandler(err, req, res));
+
 }
 
 
 
 
 
-// Delete all user (Admin only)
-module.exports.deleteAll = (req, res) => {
-	return User.deleteMany({isAdmin: false})
-	.then((deleteRes) => {
-		if (deleteRes.deletedCount !== 0){
-			return res.status(200).send({
-				message: 'All existing user cleared!'
-			})
-		} else {
-			return res.status(404).send({
-				message: 'No existing user'
-			})
-		}
-	})
-	.catch((err) => errorHandler(err, req, res));
-}
 
+// Controller for updating user profile
+module.exports.updateUserProfile = (req, res) => {
 
-
-
-// Update user profile/info/details
-module.exports.updateProfile = (req, res) => {
-	const userId = req.user.id
-
-	const updateInfo = {
-		firstName: req.body.firstName,
-		lastName: req.body.lastName,
-		mobileNum: req.body.mobileNum
+	const userId = req.user.id;
+	const { firstName, lastName, mobileNum, email } = req.body;
+	const updateDetails = {
+		firstName: firstName,
+		lastName: lastName,
+		email: email,
+		mobileNum: mobileNum
 	}
 
-	return User.findById(userId)
-	.then((isExisting) => {
-		if (isExisting.firstName === req.body.firstName && isExisting.lastName === req.body.lastName && isExisting.mobileNum === req.body.mobileNum){
-			return res.status(204).send({
-				message: 'No change made, profile is already up to date'
-			})
-		} else {
-
-			if (!req.body.firstName || req.body.firstName === ""){
-				return res.status(400).send({
-					message: 'Please fill in the first name'
-				})
-			} else if (!req.body.lastName || req.body.lastName === ""){
-				return res.status(400).send({
-					message: 'Please fill in the last name'
-				})
-			} else if (!req.body.mobileNum || req.body.mobileNum.length !== 11){
-				return res.status(400).send({
-					message: 'Invalid number format'
-				})
-			} else {
-
-				return User.findByIdAndUpdate(userId, updateInfo, { new: true })
-				.then((userRes) => {
-					if (!userRes){
-						return res.status(404).send({
-							message: 'User does not exist'
-						})
-					} else {
-						return res.status(200).send({
-							message: `Profile updated successfully`,
-							Info: userRes 
-						})
-					}
-				})
-				.catch((err) => errorHandler(err, req, res));
-
-			}
-
-		}
-	})
-
-}
-
-
-
-
-// Turn user into admin by ID (Admin only)
-module.exports.userToAdmin = (req, res) => {
-	const userId = req.params.id;
-
-	const adminData = {
-		isAdmin: true
-	}
+	const nameRegex = /^[a-zA-ZÀ-ÿ\s'-]+$/;
+	const numberRegex = /^\d+$/;
 
 	return User.findById(userId)
-	.then((existingAdmin) => {
-		if (existingAdmin.isAdmin === true){
+	.then((result) => {
+
+		if (result.firstName === firstName && result.lastName === lastName && result.email === email && result.mobileNum === mobileNum){
 			return res.status(200).send({
-				message: `This user is already an ADMIN`
+				message: 'No update was made, everything is up to date'
+			})
+		} else if (!nameRegex.test(firstName) || !nameRegex.test(lastName)){
+			return res.status(422).send({
+				message: 'Firstname and lastname should not contain numbers'
+			})
+		} else if (!numberRegex.test(mobileNum)){
+			return res.status(422).send({
+				message: 'Mobile number must contain numbers only'
+			})
+		} else if (!mobileNum.startsWith('09')){
+			return res.status(422).send({
+				message: 'Invalid mobile number format'
+			})
+		} else if (mobileNum.length !== 11){
+			return res.status(422).send({
+				message: 'Mobile should contain 11 digits only'
 			})
 		} else {
 
-			return User.findByIdAndUpdate(userId, adminData, { new: true})
-			.then((adminRes) => {
-				if (adminRes){
-					return res.status(200).send({
-						message: `${adminRes.firstName} ${adminRes.lastName} is now ADMIN`
+			return User.findByIdAndUpdate(userId, updateDetails, { new: true })
+			.then((result) => {
+				if (!result) {
+					return res.status(422).send({
+						message: 'Failed to update profile'
 					})
 				} else {
-					return res.status(404).send({
-						message: 'User does not exist'
+					return res.status(200).send({
+						message: 'Profile updated successfully'
 					})
 				}
 			})
-			.catch((err) => errorHandler(err, req, res));
-
-		}
-	})
-	.catch((err) => errorHandler(err, req, res));
-
-}
-
-
-
-
-
-// Turn Admin into a User by ID (Admin only)
-module.exports.adminToUser = (req, res) => {
-	const userId = req.params.id;
-
-	const adminData = {
-		isAdmin: false
-	}
-
-	return User.findById(userId)
-	.then((existingUser) => {
-		if (existingUser.isAdmin === false){
-			return res.status(200).send({
-				message: `${existingUser.firstName} ${existingUser.lastName} is not ADMIN`
-			})
-		} else {
-
-			return User.findByIdAndUpdate(userId, adminData, { returnDocument: 'after'})
-			.then((userRes) => {
-				if (userRes){
-					return res.status(200).send({
-						message: `${userRes.firstName} ${userRes.lastName} has been demoted from ADMIN role`
-					})
-				} else {
-					return res.status(404).send({
-						message: 'User does not exist'
-					})
-				}
-			})
-			.catch((err) => errorHandler(err, req, res));
-
-		}
-	})
-	.catch((err) => errorHandler(err, req, res));
-}
-
-
-
-
-// Change password feature for both Admin and User
-module.exports.changePassword = (req, res) => {
-	const userId = req.user.id;
-	const updatePass = {
-		password: bcrypt.hashSync(req.body.password, 10)
-	}
-
-	return User.findById(userId)
-	.then((passRes) => {
-		if (bcrypt.compareSync(req.body.password, passRes.password)){
-			return res.status(200).send({
-				message: 'No change has been made, password is up to date'
-			})
-		} else {
-
-			if (!req.body.password || req.body.password.length <= 8){
-				return res.status(400).send({
-					message: 'Password should contain greater than 8 characters'
+			.catch((err) => {
+				return res.status(500).send({
+					message: `Server error ${err}`
 				})
-			} else {
-
-				return User.findById(userId)
-				.then((existing) => {
-					if (!existing){
-						return res.status(404).send({
-							message: 'User does not exist'
-						})
-					} else {
-
-						return User.findByIdAndUpdate(userId, updatePass, { new: true})
-						.then((changePass) => {
-							if (changePass){
-								return res.status(200).send({
-									message: 'Password updated successfully'
-								})
-							} else {
-								return res.status(400).send({
-									message: 'Change password failed'
-								})
-							}
-						})
-						.catch((err) => errorHandler(err, req, res));
-
-					}
-				})
-				.catch((err) => errorHandler(err, req, res));
-
-			}
-
-		}
-	})
-
-}
-
-
-// Get user details 
-module.exports.userDetails = (req, res) => {
-	const userId = req.user.id;
-
-	return User.findById(userId)
-	.select('-password')
-	.then((detailsRes) => {
-		if (!detailsRes) {
-			return res.status(404).send({
-				message: 'User does not exist'
 			})
-		} else {
-			return res.status(200).send(detailsRes);
+
 		}
+
 	})
-	.catch((err) => errorHandler(err, req, res));
+
 }

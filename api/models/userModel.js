@@ -2,34 +2,50 @@ const mongoose = require('mongoose');
 
 
 const userSchema = new mongoose.Schema({
+
 	firstName: {
 		type: String,
-		required: [true, 'username is required']
+		required: [true, 'First name is required']
 	},
 	lastName: {
 		type: String,
-		required: [true, 'lastname is required']
+		required: [true, 'Last name is required']
 	},
 	email: {
 		type: String,
-		required: [true, 'email is required']
+		required: [true, 'Email is required']
 	},
 	password: {
 		type: String,
-		required: [true, 'password is required']
+		required: [true, 'Password is required']
 	},
 	mobileNum: {
 		type: String,
-		required: [true, 'mobile number is required']
+		required: [true, 'Mobile number is required']
 	},
 	isAdmin: {
 		type: Boolean,
 		default: false
 	},
-	createdAt: {
+	role: {
+		type: String,
+		enum: ['operator', 'renter']
+	},
+	status: {
+		type: String,
+		enum: ['approved', 'rejected', 'pending'],
+		default: 'pending'
+	},
+	isBlackListed: {
+		type: Boolean,
+		default: false
+	},
+	dateCreated: {
 		type: Date,
 		default: Date.now
 	}
+
 });
+
 
 module.exports = mongoose.model('User', userSchema);
